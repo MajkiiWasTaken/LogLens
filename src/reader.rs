@@ -10,7 +10,6 @@
 use crate::output;
 use std::{
     collections::VecDeque,
-    fs::File,
     io::{BufRead, BufReader},
     path::Path,
 };
@@ -39,7 +38,7 @@ pub fn read_file(
     level: Option<&str>,
     search: Option<&str>,
 ) -> Result<(), String> {
-    let file = File::open(path).map_err(|e| format!("Cannot open {}: {e}", path.display()))?;
+    let file = crate::follow::open_log_file(path)?;
 
     let reader = BufReader::new(file);
     let mut selected = VecDeque::with_capacity(limit.min(1024));

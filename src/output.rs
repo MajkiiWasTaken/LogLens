@@ -10,8 +10,13 @@
 use colored::Colorize;
 
 pub fn banner() {
-    println!("{}", "◆ LogLens v0.1.0".bright_blue().bold());
-    println!("{}", "────────────────────────────────".dimmed());
+    println!(
+        "\n{}",
+        format!("◆ LogLens v{}", env!("CARGO_PKG_VERSION"))
+            .bright_blue()
+            .bold()
+    );
+    println!("{}", "────────────────────────────────────────".dimmed());
 }
 
 pub fn heading(message: &str) {
