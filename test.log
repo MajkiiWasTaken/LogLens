@@ -1,0 +1,5 @@
+2026-10-13 09:00:00 [INFO] Application started
+2026-10-13 09:00:01 [WARN] High memory usage
+2026-10-13 09:00:02 [ERROR] Connection refused
+2026-10-13 09:00:03 [INFO] Retrying connection
+2026-10-13 09:00:04 [ERROR] Database unavailable
