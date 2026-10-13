@@ -7,6 +7,7 @@
 * ver. 0.3.0
 *************************************************/
 
+use crate::filter::{self, JournalFilter};
 use crate::{follow, output, reader};
 use std::{
     io::{BufRead, BufReader},
@@ -26,6 +27,9 @@ pub struct RemoteOptions<'a> {
     pub level: Option<&'a str>,
     pub search: Option<&'a str>,
     pub follow: bool,
+    pub priority: Option<&'a str>,
+    pub since: Option<&'a str>,
+    pub until: Option<&'a str>,
 }
 
 fn safe_identifier(value: &str) -> bool {
@@ -59,19 +63,35 @@ fn ssh_command(options: &RemoteOptions<'_>) -> Result<Command, String> {
         }
     }
 
-    let mut remote = format!(
-        "journalctl --no-pager --output=short-iso --lines={}",
-        options.lines
-    );
+    // Journal filters
+    let filters = JournalFilter {
+        priority: options.priority,
+        since: options.since,
+        until: options.until,
+    };
+
+    // Build remote journalctl arguments
+    let mut args = vec![
+        "journalctl".to_string(),
+        "--no-pager".to_string(),
+        "--quiet".to_string(),
+        "--output=short-iso".to_string(),
+        format!("--lines={}", options.lines),
+    ];
 
     if let Some(unit) = options.unit {
-        remote.push_str(" --unit=");
-        remote.push_str(unit);
+        args.push(format!("--unit={unit}"));
     }
 
     if options.follow {
-        remote.push_str(" --follow");
+        args.push("--follow".to_string());
     }
+
+    // Add priority and time filters
+    filter::append_remote(&mut args, &filters)?;
+
+    // SSH executes the remote command through a shell
+    let remote = args.join(" ");
 
     let mut command = Command::new("ssh");
 
@@ -93,7 +113,7 @@ fn ssh_command(options: &RemoteOptions<'_>) -> Result<Command, String> {
         command.arg("-p").arg(port.to_string());
     }
 
-    command.arg(host).arg(remote);
+    command.arg("--").arg(host).arg(remote);
 
     Ok(command)
 }

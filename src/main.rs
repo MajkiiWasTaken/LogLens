@@ -7,6 +7,7 @@
 * ver. 0.1.0
 *************************************************/
 
+mod filter;
 mod follow;
 mod journal;
 mod output;
@@ -79,6 +80,18 @@ enum Commands {
         /// Continuously follow new journal entries
         #[arg(short = 'f', long)]
         follow: bool,
+
+        /// Filter by systemd journal priority
+        #[arg(long)]
+        priority: Option<String>,
+
+        /// Show entries since a given time
+        #[arg(long)]
+        since: Option<String>,
+
+        /// Show entries until a given time
+        #[arg(long)]
+        until: Option<String>,
     },
 
     /// Follow new lines appended to a local log file
@@ -143,6 +156,18 @@ enum Commands {
         /// Follow remote logs continuously
         #[arg(short = 'f', long)]
         follow: bool,
+
+        /// Filter by systemd journal priority
+        #[arg(long)]
+        priority: Option<String>,
+
+        /// Show entries since a given time
+        #[arg(long)]
+        since: Option<String>,
+
+        /// Show entries until a given time
+        #[arg(long)]
+        until: Option<String>,
     },
 }
 
@@ -165,13 +190,23 @@ fn run() -> Result<(), String> {
             level,
             search,
             follow,
+            priority,
+            since,
+            until,
         } => {
+            let filters = filter::JournalFilter {
+                priority: priority.as_deref(),
+                since: since.as_deref(),
+                until: until.as_deref(),
+            };
+
             if follow {
                 journal::follow(
                     unit.as_deref(),
                     lines as usize,
                     level.as_deref(),
                     search.as_deref(),
+                    &filters,
                 )
             } else {
                 journal::read(
@@ -179,6 +214,7 @@ fn run() -> Result<(), String> {
                     lines as usize,
                     level.as_deref(),
                     search.as_deref(),
+                    &filters,
                 )
             }
         }
@@ -207,6 +243,9 @@ fn run() -> Result<(), String> {
             level,
             search,
             follow,
+            priority,
+            since,
+            until,
         } => remote::run(remote::RemoteOptions {
             device: &device,
             host: host.as_deref(),
@@ -217,6 +256,9 @@ fn run() -> Result<(), String> {
             level: level.as_deref(),
             search: search.as_deref(),
             follow,
+            priority: priority.as_deref(),
+            since: since.as_deref(),
+            until: until.as_deref(),
         }),
     }
 }

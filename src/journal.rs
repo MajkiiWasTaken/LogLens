@@ -7,6 +7,7 @@
 * ver. 0.1.0
 *************************************************/
 
+use crate::filter::{self, JournalFilter};
 use crate::{output, reader};
 use std::process::Command;
 
@@ -15,6 +16,7 @@ pub fn read(
     lines: usize,
     level: Option<&str>,
     search: Option<&str>,
+    filters: &JournalFilter<'_>,
 ) -> Result<(), String> {
     if !cfg!(target_os = "linux") {
         return Err("journalctl is supported only on Linux".into());
@@ -24,6 +26,7 @@ pub fn read(
 
     command
         .arg("--no-pager")
+        .arg("--quiet")
         .arg("--output=short-iso")
         .arg("--lines")
         .arg(lines.to_string());
@@ -31,6 +34,8 @@ pub fn read(
     if let Some(unit) = unit {
         command.arg("--unit").arg(unit);
     }
+
+    filter::append_local(&mut command, filters)?;
 
     let result = command
         .output()
@@ -72,6 +77,7 @@ pub fn follow(
     lines: usize,
     level: Option<&str>,
     search: Option<&str>,
+    filters: &JournalFilter<'_>,
 ) -> Result<(), String> {
     use crate::follow;
     use std::{
@@ -93,6 +99,7 @@ pub fn follow(
     command
         .arg("--no-pager")
         .arg("--output=short-iso")
+        .arg("--no-pager")
         .arg("--follow")
         .arg("--lines")
         .arg(lines.to_string())
@@ -102,6 +109,8 @@ pub fn follow(
     if let Some(unit) = unit {
         command.arg("--unit").arg(unit);
     }
+
+    filter::append_local(&mut command, filters)?;
 
     let mut child = command
         .spawn()
