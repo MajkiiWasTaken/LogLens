@@ -90,6 +90,14 @@ enum Commands {
         /// Case-insensitive text search
         #[arg(long)]
         search: Option<String>,
+
+        /// Save displayed log entries to a file
+        #[arg(long)]
+        export: Option<PathBuf>,
+
+        /// Export format: text or json
+        #[arg(long, default_value = "text")]
+        format: String,
     },
 
     /// Read Linux systemd journal logs
@@ -130,6 +138,14 @@ enum Commands {
         /// Show entries until a given time
         #[arg(long)]
         until: Option<String>,
+
+        /// Save displayed log entries to a file
+        #[arg(long)]
+        export: Option<PathBuf>,
+
+        /// Export format: text or json
+        #[arg(long, default_value = "text")]
+        format: String,
     },
 
     /// Follow new lines appended to a local log file
@@ -234,7 +250,20 @@ fn run() -> Result<(), String> {
             lines,
             level,
             search,
-        } => reader::read_file(&path, lines as usize, level.as_deref(), search.as_deref()),
+            export,
+            format,
+        } => {
+            let format = Format::parse(&format)?;
+
+            reader::read_file(
+                &path,
+                lines as usize,
+                level.as_deref(),
+                search.as_deref(),
+                export.as_deref(),
+                format,
+            )
+        }
 
         Commands::Journal {
             unit,
@@ -245,6 +274,8 @@ fn run() -> Result<(), String> {
             priority,
             since,
             until,
+            export,
+            format,
         } => {
             let filters = filter::JournalFilter {
                 priority: priority.as_deref(),
@@ -252,7 +283,15 @@ fn run() -> Result<(), String> {
                 until: until.as_deref(),
             };
 
+            let format = Format::parse(&format)?;
+
             if follow {
+                if export.is_some() {
+                    return Err(
+                        "Export during live monitoring is not supported. Omit --follow.".into(),
+                    );
+                }
+
                 journal::follow(
                     unit.as_deref(),
                     lines as usize,
@@ -267,6 +306,8 @@ fn run() -> Result<(), String> {
                     level.as_deref(),
                     search.as_deref(),
                     &filters,
+                    export.as_deref(),
+                    format,
                 )
             }
         }

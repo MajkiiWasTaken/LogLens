@@ -7,6 +7,7 @@
 * ver. 0.1.0
 *************************************************/
 
+use crate::export::{self, Format};
 use crate::output;
 use std::{
     collections::VecDeque,
@@ -37,10 +38,12 @@ pub fn read_file(
     limit: usize,
     level: Option<&str>,
     search: Option<&str>,
+    export_path: Option<&Path>,
+    format: Format,
 ) -> Result<(), String> {
     let file = crate::follow::open_log_file(path)?;
-
     let reader = BufReader::new(file);
+
     let mut selected = VecDeque::with_capacity(limit.min(1024));
     let mut matching = 0usize;
 
@@ -62,15 +65,22 @@ pub fn read_file(
 
     output::heading(&format!("Log file: {}", path.display()));
 
-    for line in selected {
-        output::log_line(&line);
+    let entries: Vec<String> = selected.into_iter().collect();
+
+    for line in &entries {
+        output::log_line(line);
     }
 
     println!();
+
     output::ok(&format!(
         "{matching} matching lines (showing last {})",
-        matching.min(limit)
+        entries.len()
     ));
+
+    if let Some(destination) = export_path {
+        export::write(destination, format, &path.display().to_string(), &entries)?;
+    }
 
     Ok(())
 }

@@ -7,8 +7,10 @@
 * ver. 0.1.0
 *************************************************/
 
+use crate::export::{self, Format};
 use crate::filter::{self, JournalFilter};
 use crate::{output, reader};
+use std::path::Path;
 use std::process::Command;
 
 pub fn read(
@@ -17,6 +19,8 @@ pub fn read(
     level: Option<&str>,
     search: Option<&str>,
     filters: &JournalFilter<'_>,
+    export_path: Option<&Path>,
+    format: Format,
 ) -> Result<(), String> {
     if !cfg!(target_os = "linux") {
         return Err("journalctl is supported only on Linux".into());
@@ -42,32 +46,35 @@ pub fn read(
         .map_err(|e| format!("Cannot execute journalctl: {e}"))?;
 
     if !result.status.success() {
-        let reason = String::from_utf8_lossy(&result.stderr);
-        return Err(format!("journalctl failed: {}", reason.trim()));
+        return Err(format!(
+            "journalctl failed: {}",
+            String::from_utf8_lossy(&result.stderr).trim()
+        ));
     }
 
-    let content = String::from_utf8_lossy(&result.stdout);
-
-    output::heading(match unit {
-        Some(_) => "Systemd service logs",
-        None => "System journal",
-    });
+    output::heading("Systemd journal");
 
     if let Some(unit) = unit {
         output::info(&format!("Unit: {unit}"));
     }
 
-    let mut count = 0usize;
+    let content = String::from_utf8_lossy(&result.stdout);
+    let mut entries = Vec::new();
 
     for line in content.lines() {
         if reader::matches(line, level, search) {
             output::log_line(line);
-            count += 1;
+            entries.push(line.to_string());
         }
     }
 
     println!();
-    output::ok(&format!("{count} matching journal entries"));
+    output::ok(&format!("{} matching journal entries", entries.len()));
+
+    if let Some(destination) = export_path {
+        let source = unit.unwrap_or("systemd journal");
+        export::write(destination, format, source, &entries)?;
+    }
 
     Ok(())
 }

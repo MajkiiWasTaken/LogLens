@@ -3,3 +3,7 @@
 2026-10-13 09:00:02 [ERROR] Connection refused
 2026-10-13 09:00:03 [INFO] Retrying connection
 2026-10-13 09:00:04 [ERROR] Database unavailable
+[INFO] Test without LogLens
+[INFO] Test 1
+[WARN] Test 2
+[ERROR] Test 3
