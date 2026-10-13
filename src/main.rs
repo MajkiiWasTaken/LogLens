@@ -7,6 +7,9 @@
 * ver. 0.1.0
 *************************************************/
 
+mod config;
+mod device;
+mod export;
 mod filter;
 mod follow;
 mod journal;
@@ -15,6 +18,7 @@ mod reader;
 mod remote;
 
 use clap::{Parser, Subcommand};
+use export::Format;
 use std::{path::PathBuf, process::ExitCode};
 
 #[derive(Parser)]
@@ -27,6 +31,40 @@ use std::{path::PathBuf, process::ExitCode};
 struct Cli {
     #[command(subcommand)]
     command: Commands,
+}
+
+#[derive(Subcommand)]
+enum DeviceCommands {
+    /// Add an SSH device profile
+    Add {
+        name: String,
+
+        #[arg(long)]
+        host: String,
+
+        #[arg(long)]
+        user: Option<String>,
+
+        #[arg(long)]
+        port: Option<u16>,
+
+        #[arg(long, default_value = "")]
+        description: String,
+    },
+
+    /// List configured devices
+    List,
+
+    /// Show a device profile
+    Info { name: String },
+
+    /// Remove a device profile
+    Remove {
+        name: String,
+
+        #[arg(long)]
+        yes: bool,
+    },
 }
 
 #[derive(Subcommand)]
@@ -168,6 +206,20 @@ enum Commands {
         /// Show entries until a given time
         #[arg(long)]
         until: Option<String>,
+
+        /// Export matching entries to a file
+        #[arg(long)]
+        export: Option<PathBuf>,
+
+        /// Export format: text or json
+        #[arg(long, default_value = "text")]
+        format: String,
+    },
+
+    /// Manage saved SSH devices
+    Device {
+        #[command(subcommand)]
+        command: DeviceCommands,
     },
 }
 
@@ -246,20 +298,57 @@ fn run() -> Result<(), String> {
             priority,
             since,
             until,
-        } => remote::run(remote::RemoteOptions {
-            device: &device,
-            host: host.as_deref(),
-            user: user.as_deref(),
-            port,
-            unit: unit.as_deref(),
-            lines,
-            level: level.as_deref(),
-            search: search.as_deref(),
-            follow,
-            priority: priority.as_deref(),
-            since: since.as_deref(),
-            until: until.as_deref(),
-        }),
+            export,
+            format,
+        } => {
+            let config = config::Config::load()?;
+            let profile = config.devices.get(&device);
+
+            let resolved_host = host
+                .as_deref()
+                .or_else(|| profile.map(|saved| saved.host.as_str()));
+
+            let resolved_user = user
+                .as_deref()
+                .or_else(|| profile.and_then(|saved| saved.user.as_deref()));
+
+            let resolved_port = port.or_else(|| profile.and_then(|saved| saved.port));
+
+            let format = Format::parse(&format)?;
+
+            remote::run(remote::RemoteOptions {
+                device: &device,
+                host: resolved_host,
+                user: resolved_user,
+                port: resolved_port,
+                unit: unit.as_deref(),
+                lines,
+                level: level.as_deref(),
+                search: search.as_deref(),
+                follow,
+                priority: priority.as_deref(),
+                since: since.as_deref(),
+                until: until.as_deref(),
+                export: export.as_deref(),
+                format,
+            })
+        }
+
+        Commands::Device { command } => match command {
+            DeviceCommands::Add {
+                name,
+                host,
+                user,
+                port,
+                description,
+            } => device::add(&name, &host, user.as_deref(), port, &description),
+
+            DeviceCommands::List => device::list(),
+
+            DeviceCommands::Info { name } => device::info(&name),
+
+            DeviceCommands::Remove { name, yes } => device::remove(&name, yes),
+        },
     }
 }
 

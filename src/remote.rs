@@ -7,8 +7,10 @@
 * ver. 0.3.0
 *************************************************/
 
+use crate::export::{self, Format};
 use crate::filter::{self, JournalFilter};
 use crate::{follow, output, reader};
+use std::path::Path;
 use std::{
     io::{BufRead, BufReader},
     process::{Command, Stdio},
@@ -30,6 +32,8 @@ pub struct RemoteOptions<'a> {
     pub priority: Option<&'a str>,
     pub since: Option<&'a str>,
     pub until: Option<&'a str>,
+    pub export: Option<&'a Path>,
+    pub format: Format,
 }
 
 fn safe_identifier(value: &str) -> bool {
@@ -127,6 +131,10 @@ pub fn run(options: RemoteOptions<'_>) -> Result<(), String> {
         output::info(&format!("Unit: {unit}"));
     }
 
+    if options.follow && options.export.is_some() {
+        return Err("Export during live monitoring is not supported. Omit --follow.".into());
+    }
+
     if options.follow {
         run_follow(&mut command, &options)
     } else {
@@ -147,17 +155,26 @@ fn run_once(command: &mut Command, options: &RemoteOptions<'_>) -> Result<(), St
     }
 
     let content = String::from_utf8_lossy(&result.stdout);
-    let mut matching = 0usize;
+    let mut entries = Vec::new();
 
     for line in content.lines() {
+        // Ignore journalctl informational messages.
+        if line.starts_with("-- Journal begins") || line.starts_with("-- No entries") {
+            continue;
+        }
+
         if reader::matches(line, options.level, options.search) {
             output::log_line(line);
-            matching += 1;
+            entries.push(line.to_string());
         }
     }
 
     println!();
-    output::ok(&format!("{matching} matching journal entries"));
+    output::ok(&format!("{} matching journal entries", entries.len()));
+
+    if let Some(path) = options.export {
+        export::write(path, options.format, options.device, &entries)?;
+    }
 
     Ok(())
 }
